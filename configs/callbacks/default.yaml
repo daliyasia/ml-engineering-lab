@@ -1,0 +1,24 @@
+defaults:
+  - model_checkpoint.yaml
+  - early_stopping.yaml
+  - rich_progress_bar.yaml
+  - mlflow_checkpoints.yaml
+  - mlflow_results.yaml
+  #- wandb_logger.yaml
+  - scheduler_lr_logger.yaml
+#  - quantizer.yaml
+  - _self_
+
+model_checkpoint:
+  dirpath: ${paths.output_dir}/checkpoints
+  filename: "epoch_{epoch:03d}"
+  monitor: "val/loss_final"
+  mode: "min"
+  save_last: True
+  auto_insert_metric_name: False
+
+early_stopping:
+  monitor: "val/loss_final"
+  patience: 50
+  mode: "min"
+

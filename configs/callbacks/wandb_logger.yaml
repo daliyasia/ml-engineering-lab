@@ -1,0 +1,17 @@
+wandb_logger:
+  _target_: src.callbacks.wandb.wandb_media_logger.WanDbLoggerImagePredictions
+  class_labels : 
+    0: "gt"
+    1: "pred"
+  step_pred : 10
+  samples : 10
+
+upload_ckpts_as_artifact:
+  _target_: src.callbacks.wandb.wandb_media_logger.UploadCheckpointsAsArtifact
+  ckpt_dir: ${paths.output_dir}/checkpoints
+  upload_best_only: True
+
+watch_model:
+  _target_: src.callbacks.wandb.wandb_media_logger.WatchModel
+  log: "gradients"
+  log_freq: 100

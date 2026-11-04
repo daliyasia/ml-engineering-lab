@@ -1,0 +1,2 @@
+mlflow_results:
+  _target_: src.callbacks.mlflow.mlflow_results_callback.MLFlowResultsCallback
