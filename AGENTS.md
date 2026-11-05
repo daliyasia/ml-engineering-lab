@@ -13,6 +13,7 @@ Run commands from the repository root:
 - `uv sync --locked`: install runtime and default development dependencies locally.
 - `docker compose build tests`: build the CUDA image with pinned uv and locked dependencies.
 - `docker compose run --build --rm tests uv run pytest tests/test_configs.py`: verify configuration instantiation without training.
+- `docker compose run --build --rm tests uv run pytest tests/test_train.py`: run bounded CPU/GPU training, distributed training, and checkpoint-resume tests.
 - `uv run pytest --collect-only`: check test discovery and imports.
 - `uv run pytest`: run the full suite, including bounded training and sweep tests.
 - `uv run python src/train.py trainer=cpu trainer.precision=32-true`: launch CPU training only when intended.
@@ -25,11 +26,13 @@ Use four-space Python indentation, `snake_case` functions/modules, and `PascalCa
 
 ## Testing Guidelines
 
-Use pytest files named `test_*.py` and functions named `test_*`. Reuse fixtures and mark expensive integration checks with `@pytest.mark.slow`. No coverage threshold is configured. Configuration tests are verified; the full suite is not established as passing. Report exact commands, failures, and skips, and preserve meaningful assertions.
+Use pytest files named `test_*.py` and functions named `test_*`. Reuse fixtures and mark expensive integration checks with `@pytest.mark.slow`. No coverage threshold is configured. The GPU Compose baseline is 15 passed and one optional W&B test skipped. Report exact commands, failures, and skips, and preserve meaningful assertions.
 
 ## Commit & Pull Request Guidelines
 
 History uses concise imperative subjects, such as “Restore Hydra training configuration.” Keep commits focused. PR descriptions should explain behavior changes, affected configurations, validation results, and relevant issue links. Distinguish configuration verification from executed training.
+
+For every “commit & push” request, run `docker compose run --build --rm tests uv run pytest --ignore=tests/test_sweeps.py` first. Exclude sweep tests from this workflow unless explicitly requested. Fix failures without weakening assertions, then commit and push the verified changes. Report results and the sweep exclusion.
 
 ## Security & Configuration
 
