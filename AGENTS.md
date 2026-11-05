@@ -20,6 +20,10 @@ Run commands from the repository root:
 
 Compose requests NVIDIA GPUs; the host needs NVIDIA Container Toolkit. Preserve Python 3.12, PyTorch 2.6.0, torchvision 0.21.0, and CUDA 12.6 compatibility. Update `uv.lock` with uv whenever dependencies change.
 
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs Python 3.12 CPU checks on PRs to `main`, pushes to `main`, and manual dispatches. Preserve locked dependencies and the sweep exclusion; GPU tests skip on hosted CPU runners. Reproduce with `CUDA_VISIBLE_DEVICES="" uv run --locked pytest --ignore=tests/test_sweeps.py -ra`. Inspect the seven-day `pytest-cpu` JUnit artifact for failures. Local Compose still validates GPU behavior.
+
 ## Coding Style & Naming Conventions
 
 Use four-space Python indentation, `snake_case` functions/modules, and `PascalCase` classes. Follow existing type annotations and Hydra `_target_` configuration patterns. Match configuration names to modules, such as `data/mnist.yaml`. No formatter or linter is currently configured; avoid unrelated formatting changes.

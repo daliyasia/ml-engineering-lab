@@ -173,6 +173,30 @@ Logger configs are included for CSV, TensorBoard, MLflow, W&B, Comet, Neptune, a
 
 Datasets, checkpoints, run outputs, Python caches, virtual environments, and `.env` files are ignored by Git. DVC metadata and example environment files remain eligible for version control.
 
+## Continuous integration
+
+GitHub Actions runs **Python tests (CPU)** on GitHub-hosted Ubuntu 24.04 for pull requests targeting `main`, pushes to `main`, and manual runs from the Actions tab. It uses Python 3.12 and uv 0.13.7, checks `uv.lock`, installs with `uv sync --locked`, and checks dependency consistency before pytest.
+
+CI excludes sweeps and runs the bounded CPU training, evaluation, distributed training, checkpoint-resume, data, and configuration tests. The two GPU-only tests skip using their existing decorators. To reproduce the test command locally after `uv sync --locked`:
+
+```bash
+CUDA_VISIBLE_DEVICES="" OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 \
+  uv run --locked pytest --ignore=tests/test_sweeps.py -ra --junitxml=/tmp/pytest-cpu.xml
+```
+
+To check the CPU test selection in the local Compose environment:
+
+```bash
+docker compose run --build --rm -e CUDA_VISIBLE_DEVICES= tests \
+  uv run --locked pytest --ignore=tests/test_sweeps.py -ra
+```
+
+The hosted job runs uv directly and needs no self-hosted runner or repository secrets. It preserves the locked CUDA dependencies; it does not build the Docker image or validate GPU execution. uv's cache is keyed by `uv.lock` and stored alongside `.venv` for space-efficient installation. Cold runs download several GB of dependencies plus MNIST; inspect dependency-step logs and available runner disk space if installation fails. The job times out after 30 minutes and cancels superseded runs.
+
+The `pytest-cpu` JUnit artifact is uploaded even after pytest fails and retained for seven days. Installation failures before pytest produce no test report; check the failed step's logs instead. Download the artifact from the workflow run to inspect failures and skips.
+
+After the first successful hosted run, repository administrators can require **Python tests (CPU)** under the branch rules for `main`. Branch protection is not changed automatically.
+
 ## Tests and remaining migration work
 
 The tests cover MNIST batches, Hydra object instantiation, short training runs, checkpoint resumption, evaluation, and sweeps. Running the full suite downloads MNIST and executes these bounded training tests; it does not start the default 500-epoch training job. For configuration checks without training, use:

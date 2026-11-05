@@ -51,6 +51,7 @@ env/
 /mlartifacts/
 /mlflow.db
 /mlflow.db-*
+/train.log
 /wandb/
 /.aim/
 *.ckpt
