@@ -5,3 +5,6 @@ defaults:
 accelerator: cpu
 devices: 2
 strategy: ddp_spawn
+
+# CPU runs use full precision.
+precision: 32-true

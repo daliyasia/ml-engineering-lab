@@ -9,6 +9,7 @@ import pyrootutils
 import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
 from lightning.pytorch.loggers import Logger
+from lightning.pytorch.callbacks import LearningRateMonitor
 from omegaconf import DictConfig
 from lightning.pytorch.plugins.environments import ClusterEnvironment
 #from lightning.pytorch.plugins.environments import KubeflowEnvironment
@@ -59,6 +60,10 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     log.info("Instantiating loggers...")
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
+
+    # LearningRateMonitor requires a logger; logger=[] also disables it for sweeps.
+    if not logger:
+        callbacks = [callback for callback in callbacks if not isinstance(callback, LearningRateMonitor)]
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
     trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)#, plugins = cluster)

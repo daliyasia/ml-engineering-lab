@@ -3,3 +3,6 @@ defaults:
 
 accelerator: cpu
 devices: 1
+
+# CPU runs use full precision.
+precision: 32-true
