@@ -136,9 +136,11 @@ class MNISTLitModule(LightningModule):
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def on_train_epoch_end(self):
-        pass
+        # Preserve the original metric names used by checkpoint consumers and tests.
+        self.log("train/acc", self.train_accuracy.compute())
 
     def on_validation_epoch_end(self):
+        self.log("val/acc", self.val_accuracy.compute())
         self.val_accuracy_best(self.val_accuracy.compute())  # update best so far val acc
         self.val_precision_best(self.val_precision.compute())
         self.val_recall_best(self.val_recall.compute())
@@ -148,10 +150,10 @@ class MNISTLitModule(LightningModule):
         self.log("val_best/precision", self.val_precision_best.compute(), prog_bar=True)
         self.log("val_best/recall", self.val_recall_best.compute(), prog_bar=True)
         self.log("val_best/f1", self.val_f1_best.compute(), prog_bar=True)
-        self.log("val_best/loss", self.val_f1_best.compute(), prog_bar=True)
+        self.log("val_best/loss", self.val_loss_best.compute(), prog_bar=True)
 
     def on_test_epoch_end(self):
-        pass
+        self.log("test/acc", self.test_accuracy.compute())
 
     def configure_optimizers(self):
         """Choose what optimizers and learning-rate schedulers to use in your optimization.

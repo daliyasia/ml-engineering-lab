@@ -1,0 +1,27 @@
+services:
+  tests:
+    image: mlcycle:uv
+    build:
+      context: .
+      dockerfile: Dockerfile/Dockerfile
+    gpus: all
+    # DataLoader workers and distributed tests need more than Docker's 64 MB default.
+    shm_size: "2gb"
+    environment:
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+
+  lock:
+    profiles: [tools]
+    image: mlcycle:uv-base
+    build:
+      context: .
+      dockerfile: Dockerfile/Dockerfile
+      target: uv-base
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+    environment:
+      UV_CACHE_DIR: /tmp/uv-cache
+    command: [uv, lock]

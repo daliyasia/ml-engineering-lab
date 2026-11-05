@@ -4,12 +4,12 @@
 # order of defaults determines the order in which configs override each other
 defaults:
   - _self_
-  - data: vignface.yaml
-  - model: vignface.yaml
+  - data: mnist.yaml
+  - model: mnist.yaml
   #- cluster: cluster.yaml
   - callbacks: default.yaml
-  - logger: mlflow.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
-  - trainer: ddp.yaml
+  - logger: mlflow.yaml # set logger here or use command line (e.g. `uv run python src/train.py logger=tensorboard`)
+  - trainer: gpu.yaml
   - paths: default.yaml
   - extras: default.yaml
   - hydra: default.yaml
@@ -25,7 +25,7 @@ defaults:
   # it's optional since it doesn't need to exist and is excluded from version control
   - optional local: default.yaml
 
-  # debugging config (enable through command line, e.g. `python train.py debug=default)
+  # debugging config (enable through command line, e.g. `uv run python src/train.py debug=default)
   - debug: null
 
 # task name, determines output directory path
@@ -33,7 +33,7 @@ task_name: "train"
 
 # tags to help you identify your experiments
 # you can overwrite this in experiment configs
-# overwrite from command line with `python train.py tags="[first_tag, second_tag]"`
+# overwrite from command line with `uv run python src/train.py tags="[first_tag, second_tag]"`
 tags: ["dev"]
 
 # set False to skip model training
