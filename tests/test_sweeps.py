@@ -4,7 +4,8 @@ from tests.helpers.run_if import RunIf
 from tests.helpers.run_sh_command import run_sh_command
 
 startfile = "src/train.py"
-overrides = ["logger=[]"]
+# Keep data loading in each training process, as in the shared test fixtures.
+overrides = ["logger=[]", "data.num_workers=0"]
 
 
 @RunIf(sh=True)
@@ -86,5 +87,6 @@ def test_optuna_sweep_ddp_sim_wandb(tmp_path):
         "+trainer.limit_val_batches=0.1",
         "+trainer.limit_test_batches=0.1",
         "logger=wandb",
+        "data.num_workers=0",
     ]
     run_sh_command(command)

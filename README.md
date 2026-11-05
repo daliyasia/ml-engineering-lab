@@ -116,6 +116,23 @@ uv run pytest tests/test_configs.py
 uv run pytest
 ```
 
+### Open a container for debugging
+
+From the repository root, start an interactive Bash shell with GPU access and your working tree mounted:
+
+```bash
+docker compose run --build --rm -v "$PWD:/workspace" -w /workspace tests bash
+```
+
+Edits made on the host are immediately available in `/workspace`. Inside the container, run configuration checks or enter Python's debugger on a test failure:
+
+```bash
+uv run pytest tests/test_configs.py
+uv run pytest tests/test_configs.py --pdb
+```
+
+Type `exit` to leave the shell and remove the temporary container. Changes to mounted project files remain on the host.
+
 ## Training configuration
 
 The default configuration selects MNIST, the classification ResNet, default callbacks monitoring `val/loss`, MLflow, and a GPU trainer. CPU use requires full precision:
@@ -167,6 +184,6 @@ docker compose run --rm tests uv run pytest --collect-only
 
 Verified in the GPU-enabled Compose image: `tests/test_configs.py` — **2 passed, 0 skipped**, with 16 dependency/framework warnings (9.29 seconds). CUDA tensor execution was also verified on an NVIDIA GeForce RTX 2060.
 
-The full integration suite is not verified as passing. Configuration tests instantiate the data module, model, and trainer without training or downloading MNIST. Some legacy debug presets and retained detection utilities still need cleanup.
+Full-suite verification in the GPU-enabled Compose image: **15 passed, 1 skipped**, with 46 warnings (205.86 seconds), using `docker compose run --build --rm tests uv run pytest`. The optional W&B sweep test skipped because W&B is not installed. Future commit-and-push checks exclude `tests/test_sweeps.py` unless explicitly requested. Configuration tests instantiate the data module, model, and trainer without training or downloading MNIST. Some legacy debug presets and retained detection utilities still need cleanup.
 
 To add another classification dataset, implement a data module under `src/data/` and a matching data config. Update the network input channels, output classes, and Lightning metrics together: the current network expects grayscale images, and the module's metrics are fixed to ten classes.
