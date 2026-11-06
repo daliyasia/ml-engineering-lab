@@ -39,7 +39,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "ruff==0.17.4",
+    "mypy==2.4.1",
     "pytest",
+    "pytest-cov>=7,<8",
     "sh; sys_platform != 'win32'",
     "hydra-optuna-sweeper==1.2.0",
     # Test helpers still import pkg_resources (removed in setuptools 82).
@@ -62,5 +65,53 @@ url = "https://download.pytorch.org/whl/cu126"
 explicit = true
 
 [tool.pytest.ini_options]
+addopts = "--cov --cov-config=pyproject.toml --cov-report=term-missing --cov-report=json"
 pythonpath = ["."]
 markers = ["slow: integration tests with short training or sweep runs"]
+
+[tool.coverage.run]
+source = ["src"]
+branch = true
+concurrency = ["multiprocessing", "thread"]
+parallel = true
+relative_files = true
+
+[tool.coverage.report]
+include_namespace_packages = true
+
+[tool.coverage.json]
+output = "coverage.json"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 99
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+extend-exclude = [
+    "data/**", "logs/**", "outputs/**", "multirun/**", "checkpoints/**", "lightning_logs/**",
+    "mlruns/**", "mlartifacts/**", "wandb/**", ".aim/**", ".cache/**", "htmlcov/**", "tmp/**", "temp/**",
+    "build/**", "dist/**", "generated/**",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+# Expand this list as the legacy detection helpers and cluster plugin are repaired.
+files = [
+    "src/train.py", "src/eval.py", "src/data", "src/models/mnist_module.py",
+    "src/models/components", "src/utils",
+]
+check_untyped_defs = true
+warn_unused_ignores = true
+show_error_codes = true
+exclude = '^(generated|data|logs|outputs|multirun|checkpoints|build|dist|\.cache|\.venv)/'
+
+[[tool.mypy.overrides]]
+# torchvision and pyrootutils ship without typing metadata; wandb is optional.
+module = ["torchvision.*", "pyrootutils", "wandb.*"]
+ignore_missing_imports = true

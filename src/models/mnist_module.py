@@ -1,5 +1,4 @@
-import os
-from typing import Any, List
+from typing import Any, Callable
 
 import torch
 from lightning import LightningModule
@@ -26,8 +25,11 @@ class MNISTLitModule(LightningModule):
     def __init__(
         self,
         net: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: torch.optim.lr_scheduler,
+        optimizer: Callable[..., torch.optim.Optimizer],
+        scheduler: Callable[
+            ..., torch.optim.lr_scheduler.LRScheduler | torch.optim.lr_scheduler.ReduceLROnPlateau
+        ]
+        | None,
     ):
         super().__init__()
         self.save_hyperparameters(logger=False, ignore=["net"])
@@ -97,8 +99,12 @@ class MNISTLitModule(LightningModule):
         self.train_confusion(preds, targets)
 
         self.log("train/loss", self.train_loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/accuracy", self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/precision", self.train_precision, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(
+            "train/accuracy", self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True
+        )
+        self.log(
+            "train/precision", self.train_precision, on_step=False, on_epoch=True, prog_bar=True
+        )
         self.log("train/recall", self.train_recall, on_step=False, on_epoch=True, prog_bar=True)
         self.log("train/f1", self.train_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {"loss": loss, "preds": preds, "targets": targets}
@@ -130,7 +136,9 @@ class MNISTLitModule(LightningModule):
         self.test_confusion(preds, targets)
         self.log("test/loss", self.test_loss, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/accuracy", self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("test/precision", self.test_precision, on_step=False, on_epoch=True, prog_bar=True)
+        self.log(
+            "test/precision", self.test_precision, on_step=False, on_epoch=True, prog_bar=True
+        )
         self.log("test/recall", self.test_recall, on_step=False, on_epoch=True, prog_bar=True)
         self.log("test/f1", self.test_f1, on_step=False, on_epoch=True, prog_bar=True)
         return {"loss": loss, "preds": preds, "targets": targets}
@@ -162,9 +170,9 @@ class MNISTLitModule(LightningModule):
         Examples:
             https://lightning.ai/docs/pytorch/latest/common/lightning_module.html#configure-optimizers
         """
-        optimizer = self.hparams.optimizer(params=self.parameters())
-        if self.hparams.scheduler is not None:
-            scheduler = self.hparams.scheduler(optimizer=optimizer)
+        optimizer = self.hparams["optimizer"](params=self.parameters())
+        if self.hparams["scheduler"] is not None:
+            scheduler = self.hparams["scheduler"](optimizer=optimizer)
             return {
                 "optimizer": optimizer,
                 "lr_scheduler": {
@@ -178,4 +186,4 @@ class MNISTLitModule(LightningModule):
 
 
 if __name__ == "__main__":
-    _ = MNISTLitModule(None, None, None)
+    _ = MNISTLitModule(torch.nn.Linear(1, 10), torch.optim.Adam, None)

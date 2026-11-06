@@ -49,6 +49,7 @@ jobs:
         run: uv lock --check
 
       - name: Install locked dependencies
+        id: dependencies
         run: uv sync --locked
 
       - name: Check installed dependencies
@@ -58,6 +59,50 @@ jobs:
         run: >-
           uv run --locked pytest --ignore=tests/test_sweeps.py -ra
           --junitxml="$RUNNER_TEMP/pytest-cpu.xml"
+
+      - name: Ruff lint
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: uv run --locked ruff check .
+
+      - name: Ruff formatting
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        run: uv run --locked ruff format --check .
+
+      - name: MyPy core training path
+        if: ${{ !cancelled() && steps.dependencies.outcome == 'success' }}
+        # Explicit paths keep the initial scope visible; pyproject.toml mirrors this list.
+        run: >-
+          uv run --locked mypy src/train.py src/eval.py src/data
+          src/models/mnist_module.py src/models/components src/utils
+
+      - name: Publish coverage summary
+        if: ${{ always() }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = Path("coverage.json")
+          lines = ["## CPU test coverage", ""]
+          if report.is_file():
+              totals = json.loads(report.read_text())["totals"]
+              lines += ["| Metric | Covered / total | Coverage |", "| --- | ---: | ---: |"]
+              for label, covered, total in [
+                  ("Statements", totals["covered_lines"], totals["num_statements"]),
+                  ("Branches", totals["covered_branches"], totals["num_branches"]),
+                  ("Combined", totals["covered_lines"] + totals["covered_branches"],
+                   totals["num_statements"] + totals["num_branches"]),
+              ]:
+                  percentage = f"{100 * covered / total:.2f}%" if total else "N/A"
+                  lines.append(f"| {label} | {covered} / {total} | {percentage} |")
+          else:
+              lines.append("Coverage unavailable: the test run did not generate coverage.json.")
+          summary = "\n".join(lines) + "\n"
+          print(summary)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as output:
+              output.write(summary)
+          PY
 
       - name: Upload CPU test report
         if: ${{ always() }}

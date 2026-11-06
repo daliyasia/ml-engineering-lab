@@ -1,29 +1,26 @@
 import os
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 # Version 1
 import hydra
 import lightning as L
-import mlflow
 import pyrootutils
 import torch
 from lightning import Callback, LightningDataModule, LightningModule, Trainer
+from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from lightning.pytorch.loggers import Logger
-from lightning.pytorch.callbacks import LearningRateMonitor
 from omegaconf import DictConfig
-from lightning.pytorch.plugins.environments import ClusterEnvironment
-#from lightning.pytorch.plugins.environments import KubeflowEnvironment
 
+# from lightning.pytorch.plugins.environments import KubeflowEnvironment
 
 
 pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 
-
 # ------------------------------------------------------------------------------------ #
 
-from src import utils
+from src import utils  # noqa: E402 -- root setup must precede local imports
 
 log = utils.get_pylogger(__name__)
 
@@ -52,9 +49,9 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
     log.info(f"Instantiating model <{cfg.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(cfg.model)
 
-    '''log.info("Instantiating cluster...")
-    cluster: ClusterEnvironment = hydra.utils.instantiate(cfg.cluster)'''
-    
+    """log.info("Instantiating cluster...")
+    cluster: ClusterEnvironment = hydra.utils.instantiate(cfg.cluster)"""
+
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
 
@@ -63,10 +60,14 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     # LearningRateMonitor requires a logger; logger=[] also disables it for sweeps.
     if not logger:
-        callbacks = [callback for callback in callbacks if not isinstance(callback, LearningRateMonitor)]
+        callbacks = [
+            callback for callback in callbacks if not isinstance(callback, LearningRateMonitor)
+        ]
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)#, plugins = cluster)
+    trainer: Trainer = hydra.utils.instantiate(
+        cfg.trainer, callbacks=callbacks, logger=logger
+    )  # , plugins = cluster)
 
     results_dir = os.path.join(trainer.default_root_dir, "results")
     os.makedirs(results_dir, exist_ok=True)
@@ -86,7 +87,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("compile"):
         log.info("Compiling model!")
-        model = torch.compile(model)
+        # Compiling an nn.Module preserves its module interface at runtime.
+        model = cast(LightningModule, torch.compile(model))
 
     if cfg.get("train"):
         log.info("Starting training!")
@@ -96,7 +98,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
 
     if cfg.get("test"):
         log.info("Starting testing!")
-        ckpt_path = trainer.checkpoint_callback.best_model_path
+        # The configured model_checkpoint callback supplies best_model_path.
+        ckpt_path: str | None = cast(ModelCheckpoint, trainer.checkpoint_callback).best_model_path
         if ckpt_path == "":
             log.warning("Best ckpt not found! Using current weights for testing...")
             ckpt_path = None
@@ -121,7 +124,9 @@ def main(cfg: DictConfig) -> Optional[float]:
     metric_dict, _ = train(cfg)
 
     # safely retrieve metric value for hydra-based hyperparameter optimization
-    metric_value = utils.get_metric_value(metric_dict=metric_dict, metric_name=cfg.get("optimized_metric"))
+    metric_value = utils.get_metric_value(
+        metric_dict=metric_dict, metric_name=cfg.get("optimized_metric")
+    )
 
     # return optimized metric
     return metric_value

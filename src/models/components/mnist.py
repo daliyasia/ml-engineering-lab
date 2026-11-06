@@ -1,9 +1,10 @@
-from typing import Any, Callable, List, Optional, Type, Union
+from typing import Callable, List, Optional, Type, Union, cast
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
+
 
 def conv3x3(
     in_planes: int, out_planes: int, stride: int = 1, groups: int = 1, dilation: int = 1
@@ -167,10 +168,18 @@ class ResNet(nn.Module):
         self.conv2 = nn.Conv2d(256, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = norm_layer(self.inplanes)
 
-        self.layer1 = self._make_layer(self.block, bottleneck_dims[0], layers[0], stride=strides[0])
-        self.layer2 = self._make_layer(self.block, bottleneck_dims[1], layers[1], stride=strides[1], dilate=replace_s_w_d[0])
-        self.layer3 = self._make_layer(self.block, bottleneck_dims[2], layers[2], stride=strides[2], dilate=replace_s_w_d[1])
-        self.layer4 = self._make_layer(self.block, bottleneck_dims[3], layers[3], stride=strides[3], dilate=replace_s_w_d[2])
+        self.layer1 = self._make_layer(
+            self.block, bottleneck_dims[0], layers[0], stride=strides[0]
+        )
+        self.layer2 = self._make_layer(
+            self.block, bottleneck_dims[1], layers[1], stride=strides[1], dilate=replace_s_w_d[0]
+        )
+        self.layer3 = self._make_layer(
+            self.block, bottleneck_dims[2], layers[2], stride=strides[2], dilate=replace_s_w_d[1]
+        )
+        self.layer4 = self._make_layer(
+            self.block, bottleneck_dims[3], layers[3], stride=strides[3], dilate=replace_s_w_d[2]
+        )
 
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(bottleneck_dims[3], n_classes, bias=False)
@@ -185,9 +194,10 @@ class ResNet(nn.Module):
         if zero_init_residual:
             for m in self.modules():
                 if isinstance(m, Bottleneck):
-                    nn.init.constant_(m.bn3.weight, 0)
+                    # Custom normalization factories return Module; these are tensor weights.
+                    nn.init.constant_(cast(Tensor, m.bn3.weight), 0)
                 elif isinstance(m, BasicBlock):
-                    nn.init.constant_(m.bn2.weight, 0)
+                    nn.init.constant_(cast(Tensor, m.bn2.weight), 0)
 
     def _make_layer(
         self,
