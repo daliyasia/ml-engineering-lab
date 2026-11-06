@@ -9,6 +9,9 @@ venv
 env
 **/__pycache__
 .pytest_cache
+.coverage
+.coverage.*
+coverage.json
 .cache
 data
 logs

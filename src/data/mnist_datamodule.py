@@ -1,6 +1,4 @@
-import os
-import pickle
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, cast
 
 import torch
 from lightning import LightningDataModule
@@ -44,14 +42,16 @@ class MNISTDataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
 
         # data transformations
-        self.transforms_train = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
-        self.transforms_test = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))])
+        self.transforms_train = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        )
+        self.transforms_test = transforms.Compose(
+            [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
+        )
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
-
-        
 
     @property
     def num_classes(self):
@@ -62,8 +62,8 @@ class MNISTDataModule(LightningDataModule):
 
         Do not use it to assign state (self.x = y).
         """
-        MNIST(self.hparams.data_dir, train=True, download=True)
-        MNIST(self.hparams.data_dir, train=False, download=True)
+        MNIST(self.hparams["data_dir"], train=True, download=True)
+        MNIST(self.hparams["data_dir"], train=False, download=True)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
@@ -73,39 +73,40 @@ class MNISTDataModule(LightningDataModule):
         """
         # load and split datasets only if not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            trainset = MNIST(self.hparams.data_dir, train=True, transform=self.transforms_train)
-            testset = MNIST(self.hparams.data_dir, train=False, transform=self.transforms_test)
-            dataset = ConcatDataset(datasets=[trainset, testset])
+            trainset = MNIST(self.hparams["data_dir"], train=True, transform=self.transforms_train)
+            testset = MNIST(self.hparams["data_dir"], train=False, transform=self.transforms_test)
+            dataset: ConcatDataset[Any] = ConcatDataset(datasets=[trainset, testset])
             self.data_train, self.data_val, self.data_test = random_split(
                 dataset=dataset,
-                lengths=self.hparams.train_val_test_split,
+                lengths=self.hparams["train_val_test_split"],
                 generator=torch.Generator().manual_seed(42),
             )
 
     def train_dataloader(self):
         return DataLoader(
-            dataset=self.data_train,
-            batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
+            # Lightning calls setup before requesting dataloaders.
+            dataset=cast(Dataset[Any], self.data_train),
+            batch_size=self.hparams["batch_size"],
+            num_workers=self.hparams["num_workers"],
+            pin_memory=self.hparams["pin_memory"],
             shuffle=True,
         )
 
     def val_dataloader(self):
         return DataLoader(
-            dataset=self.data_val,
-            batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
+            dataset=cast(Dataset[Any], self.data_val),
+            batch_size=self.hparams["batch_size"],
+            num_workers=self.hparams["num_workers"],
+            pin_memory=self.hparams["pin_memory"],
             shuffle=False,
         )
 
     def test_dataloader(self):
         return DataLoader(
-            dataset=self.data_test,
-            batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-            pin_memory=self.hparams.pin_memory,
+            dataset=cast(Dataset[Any], self.data_test),
+            batch_size=self.hparams["batch_size"],
+            num_workers=self.hparams["num_workers"],
+            pin_memory=self.hparams["pin_memory"],
             shuffle=False,
         )
 

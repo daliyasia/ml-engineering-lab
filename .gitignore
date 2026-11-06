@@ -12,6 +12,7 @@ __pycache__/
 .coverage.*
 htmlcov/
 coverage.xml
+coverage.json
 
 # Virtual environments and Python build artifacts
 .venv/

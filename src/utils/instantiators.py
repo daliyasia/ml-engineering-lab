@@ -1,16 +1,16 @@
 from typing import List
 
 import hydra
+from lightning import Callback
+from lightning.pytorch.loggers import Logger
 from omegaconf import DictConfig
-from pytorch_lightning import Callback
-from pytorch_lightning.loggers import Logger
 
 from src.utils import pylogger
 
 log = pylogger.get_pylogger(__name__)
 
 
-def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
+def instantiate_callbacks(callbacks_cfg: DictConfig | None) -> List[Callback]:
     """Instantiates callbacks from config."""
     callbacks: List[Callback] = []
 
@@ -29,7 +29,7 @@ def instantiate_callbacks(callbacks_cfg: DictConfig) -> List[Callback]:
     return callbacks
 
 
-def instantiate_loggers(logger_cfg: DictConfig) -> List[Logger]:
+def instantiate_loggers(logger_cfg: DictConfig | None) -> List[Logger]:
     """Instantiates loggers from config."""
     logger: List[Logger] = []
 

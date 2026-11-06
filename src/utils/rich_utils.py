@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, cast
 
 import rich
 import rich.syntax
@@ -45,10 +45,14 @@ def print_config_tree(
 
     # add fields from `print_order` to queue
     for field in print_order:
-        queue.append(field) if field in cfg else log.warning(f"Field '{field}' not found in config. Skipping '{field}' config printing...")
+        queue.append(field) if field in cfg else log.warning(
+            f"Field '{field}' not found in config. Skipping '{field}' config printing..."
+        )
 
     # add all the other fields to queue (not specified in `print_order`)
-    for field in cfg:
+    for key in cfg:
+        # Hydra's configuration groups use string keys.
+        field = cast(str, key)
         if field not in queue:
             queue.append(field)
 
@@ -77,12 +81,14 @@ def print_config_tree(
 def enforce_tags(cfg: DictConfig, save_to_file: bool = False) -> None:
     """Prompts user to input tags from command line if no tags are provided in config."""
     if not cfg.get("tags"):
-        if "id" in HydraConfig().cfg.hydra.job:
+        # Hydra exposes a structured DictConfig at runtime, typed as the schema dataclass.
+        job_cfg = cast(DictConfig, HydraConfig.get().job)
+        if "id" in job_cfg:
             raise ValueError("Specify tags before launching a multirun!")
 
         log.warning("No tags provided in config. Prompting user to input tags...")
-        tags = Prompt.ask("Enter a list of comma separated tags", default="dev")
-        tags = [t.strip() for t in tags.split(",") if t != ""]
+        tags_input = Prompt.ask("Enter a list of comma separated tags", default="dev")
+        tags = [t.strip() for t in tags_input.split(",") if t != ""]
 
         with open_dict(cfg):
             cfg.tags = tags

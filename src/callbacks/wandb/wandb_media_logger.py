@@ -1,16 +1,14 @@
-import os
-from typing import Any, List
-from lightning import LightningModule, Trainer
-
-import matplotlib.pyplot as plt
-from lightning.pytorch.callbacks.callback import Callback
-import numpy as np
-import wandb
-from src.models.utils.box_utils import decode, py_nms_torch
-import torch.nn.functional as F
-import torch
-from pytorch_lightning.utilities import rank_zero_only
 from pathlib import Path
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+import wandb
+from lightning.pytorch.callbacks.callback import Callback
+from pytorch_lightning.utilities import rank_zero_only
+
+from src.models.utils.box_utils import decode, py_nms_torch
+
 
 class UploadCheckpointsAsArtifact(Callback):
     """Upload checkpoints to wandb as an artifact, at the end of run."""
@@ -38,6 +36,7 @@ class UploadCheckpointsAsArtifact(Callback):
 
         experiment.log_artifact(ckpts)
 
+
 class WatchModel(Callback):
     """Make wandb watch model at the beginning of the run."""
 
@@ -48,11 +47,12 @@ class WatchModel(Callback):
     @rank_zero_only
     def on_train_start(self, trainer, pl_module):
         logger = trainer.logger
-        
+
         logger.watch(model=trainer.model, log=self.log_, log_freq=self.log_freq, log_graph=True)
-               
+
+
 class WanDbLoggerImagePredictions(Callback):
-    def __init__(self,class_labels, step_pred, samples ):
+    def __init__(self, class_labels, step_pred, samples):
         self.check_data_val = True
         self.check_data_train = True
         self.class_labels = dict(class_labels)
@@ -60,41 +60,43 @@ class WanDbLoggerImagePredictions(Callback):
         self.step_pred = step_pred
         self.samples = samples
         pass
-    
+
     def on_sanity_check_start(self, trainer, pl_module):
         self.ready = False
 
     def on_sanity_check_end(self, trainer, pl_module):
         """Start executing this callback only after all validation sanity checks end."""
         self.ready = True
-        
+
     def on_train_epoch_end(self, trainer, pl_module):
-        self.epochs += 1    
-        
-    def on_validation_epoch_end(self, trainer, pl_module): 
-        if self.epochs % self.step_pred == 0:#self.ready:
+        self.epochs += 1
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        if self.epochs % self.step_pred == 0:  # self.ready:
             batch = next(iter(trainer.datamodule.val_dataloader()))
             imgs, targets = batch
-            imgs, targets = imgs[:self.samples], targets[:self.samples]
+            imgs, targets = imgs[: self.samples], targets[: self.samples]
             imgs = imgs.to(pl_module.device)
             outs = pl_module(imgs)
             locs = outs[0]
-            confs =  F.softmax(outs[1], dim=-1)
+            confs = F.softmax(outs[1], dim=-1)
             targets = [target.to(pl_module.device) for target in targets]
-            #loss_l, loss_c = pl_module.criterion(outs, pl_module.priors, targets, pl_module.device)
+            # loss_l, loss_c = pl_module.criterion(outs, pl_module.priors, targets, pl_module.device)
             boxes_list = []
             targets_list = []
-            
-            for num_img in range(0,len(targets)):
-                target = targets[num_img][:,0:4]
-                
+
+            for num_img in range(0, len(targets)):
+                target = targets[num_img][:, 0:4]
+
                 loc = locs[num_img]
                 conf = confs[num_img]
-                
+
                 target[:, 0::2] *= pl_module.priorbox.image_size[0]
                 target[:, 1::2] *= pl_module.priorbox.image_size[1]
-               
-                boxes = decode(loc.data.squeeze(0), pl_module.priors.data, pl_module.criterion.variance)
+
+                boxes = decode(
+                    loc.data.squeeze(0), pl_module.priors.data, pl_module.criterion.variance
+                )
                 boxes[:, 0::2] *= pl_module.priorbox.image_size[0]
                 boxes[:, 1::2] *= pl_module.priorbox.image_size[1]
                 scores = conf[:, 1]
@@ -105,66 +107,63 @@ class WanDbLoggerImagePredictions(Callback):
                 boxes = boxes[order]
                 scores = scores[order]
                 dets = torch.hstack((boxes, scores[:, np.newaxis]))
-                keep = py_nms_torch(dets,0.4)
+                keep = py_nms_torch(dets, 0.4)
                 dets = dets[keep, :]
-                                
-                boxes_list.append(dets[:,0:4])
+
+                boxes_list.append(dets[:, 0:4])
                 targets_list.append(target)
-            
-            
-            for id,img in enumerate(imgs):
-                im = img.cpu().numpy().transpose(1,2,0)+[104, 117, 123]
-                im = im[...,::-1]
-                
+
+            for id, img in enumerate(imgs):
+                im = img.cpu().numpy().transpose(1, 2, 0) + [104, 117, 123]
+                im = im[..., ::-1]
+
                 trainer.logger.experiment.log(
-                {
-                    f"Data Validation/epoch_{self.epochs}": [
-                    wandb.Image(
-                        im,
-                        boxes={
-                            "targets": {
-                                "box_data": [
-                                    {
-                                        "position": {
-                                            "minX": int(box[0].item()),
-                                            "minY": int(box[1].item()),
-                                            "maxX": int(box[2].item()),
-                                            "maxY": int(box[3].item()),
-                                        },
-                                        "class_id": 0,
-                                        "box_caption": self.class_labels[0],
-                                        "domain": "pixel",
-                                    }
-                                    for box in targets_list[id].cpu()
-                                ],
-                                "class_labels":self.class_labels
-                            }
-                            ,
-                            "predictions": {
-                                "box_data": [
-                                    {
-                                        "position": {
-                                            "minX": int(box[0].item()),
-                                            "minY": int(box[1].item()),
-                                            "maxX": int(box[2].item()),
-                                            "maxY": int(box[3].item()),
-                                        },
-                                        "class_id": 1,
-                                        "box_caption": self.class_labels[0][1],
-                                        "domain": "pixel",
-                                    }
-                                    for box in boxes_list[id].cpu()
-                                ],
-                                "class_labels":self.class_labels
-                            }
-                        },
-                    )
-                    ]
-                }
+                    {
+                        f"Data Validation/epoch_{self.epochs}": [
+                            wandb.Image(
+                                im,
+                                boxes={
+                                    "targets": {
+                                        "box_data": [
+                                            {
+                                                "position": {
+                                                    "minX": int(box[0].item()),
+                                                    "minY": int(box[1].item()),
+                                                    "maxX": int(box[2].item()),
+                                                    "maxY": int(box[3].item()),
+                                                },
+                                                "class_id": 0,
+                                                "box_caption": self.class_labels[0],
+                                                "domain": "pixel",
+                                            }
+                                            for box in targets_list[id].cpu()
+                                        ],
+                                        "class_labels": self.class_labels,
+                                    },
+                                    "predictions": {
+                                        "box_data": [
+                                            {
+                                                "position": {
+                                                    "minX": int(box[0].item()),
+                                                    "minY": int(box[1].item()),
+                                                    "maxX": int(box[2].item()),
+                                                    "maxY": int(box[3].item()),
+                                                },
+                                                "class_id": 1,
+                                                "box_caption": self.class_labels[0][1],
+                                                "domain": "pixel",
+                                            }
+                                            for box in boxes_list[id].cpu()
+                                        ],
+                                        "class_labels": self.class_labels,
+                                    },
+                                },
+                            )
+                        ]
+                    }
                 )
-                    
-      
-    '''def on_validation_batch_end(self,trainer, pl_module, outputs, batch, batch_idx):
+
+    """def on_validation_batch_end(self,trainer, pl_module, outputs, batch, batch_idx):
         print(1)
         if batch_idx == 2:
             if self.check_data_val and self.ready:
@@ -223,9 +222,9 @@ class WanDbLoggerImagePredictions(Callback):
                     )
                     
         else:
-            pass'''
-        
-    
+            pass"""
+
+
 '''class LogConfusionMatrix(Callback):
     """Generate confusion matrix every epoch and send it to wandb.
     Expects validation step to return predictions and targets.
@@ -281,4 +280,4 @@ class WanDbLoggerImagePredictions(Callback):
             plt.clf()
 
             self.preds.clear()
-            self.targets.clear() '''      
+            self.targets.clear() '''

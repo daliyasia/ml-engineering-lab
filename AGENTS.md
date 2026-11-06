@@ -8,25 +8,27 @@
 
 ## Build, Test, and Development Commands
 
+When asked to run project code, always use Docker Compose, including training, evaluation, tests, and diagnostic scripts. Do not run project Python or uv commands directly on the host unless explicitly requested.
+
 Run commands from the repository root:
 
-- `uv sync --locked`: install runtime and default development dependencies locally.
 - `docker compose build tests`: build the CUDA image with pinned uv and locked dependencies.
 - `docker compose run --build --rm tests uv run pytest tests/test_configs.py`: verify configuration instantiation without training.
 - `docker compose run --build --rm tests uv run pytest tests/test_train.py`: run bounded CPU/GPU training, distributed training, and checkpoint-resume tests.
-- `uv run pytest --collect-only`: check test discovery and imports.
-- `uv run pytest`: run the full suite, including bounded training and sweep tests.
-- `uv run python src/train.py trainer=cpu trainer.precision=32-true`: launch CPU training only when intended.
+- `docker compose run --build --rm tests uv run pytest --collect-only`: check test discovery and imports.
+- `docker compose run --build --rm tests uv run pytest`: run the full suite, including bounded training and sweep tests.
+- `docker compose run --build --rm tests uv run python src/train.py`: launch training with the default configuration.
+- `docker compose run --build --rm tests uv run python src/train.py trainer=cpu trainer.precision=32-true`: launch CPU training only when intended.
 
 Compose requests NVIDIA GPUs; the host needs NVIDIA Container Toolkit. Preserve Python 3.12, PyTorch 2.6.0, torchvision 0.21.0, and CUDA 12.6 compatibility. Update `uv.lock` with uv whenever dependencies change.
 
 ## Continuous Integration
 
-`.github/workflows/ci.yml` runs Python 3.12 CPU checks on PRs to `main`, pushes to `main`, and manual dispatches. Preserve locked dependencies and the sweep exclusion; GPU tests skip on hosted CPU runners. Reproduce with `CUDA_VISIBLE_DEVICES="" uv run --locked pytest --ignore=tests/test_sweeps.py -ra`. Inspect the seven-day `pytest-cpu` JUnit artifact for failures. Local Compose still validates GPU behavior.
+`.github/workflows/ci.yml` runs Python 3.12 CPU checks on PRs to `main`, pushes to `main`, and manual dispatches. Direct uv commands in that workflow run on GitHub Actions runners; local reproduction must use Docker Compose. Preserve locked dependencies and the sweep exclusion; GPU tests skip on hosted CPU runners. Reproduce the CPU test command locally with `docker compose run --build --rm -e CUDA_VISIBLE_DEVICES="" tests uv run --locked pytest --ignore=tests/test_sweeps.py -ra`. Inspect the seven-day `pytest-cpu` JUnit artifact for failures. Local Compose still validates GPU behavior when CUDA devices are visible.
 
 ## Coding Style & Naming Conventions
 
-Use four-space Python indentation, `snake_case` functions/modules, and `PascalCase` classes. Follow existing type annotations and Hydra `_target_` configuration patterns. Match configuration names to modules, such as `data/mnist.yaml`. No formatter or linter is currently configured; avoid unrelated formatting changes.
+Use four-space Python indentation, `snake_case` functions/modules, and `PascalCase` classes. Follow existing type annotations and Hydra `_target_` configuration patterns. Match configuration names to modules, such as `data/mnist.yaml`. Ruff enforces lint, import ordering, and formatting with a 99-character line target. MyPy checks the core training path configured in `pyproject.toml`; avoid broad typing suppressions. Run quality tools through Docker Compose, for example `docker compose run --build --rm tests uv run --locked ruff check .`, `docker compose run --build --rm tests uv run --locked ruff format --check .`, and `docker compose run --build --rm tests uv run --locked mypy`.
 
 ## Testing Guidelines
 

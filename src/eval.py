@@ -24,7 +24,7 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # more info: https://github.com/ashleve/pyrootutils
 # ------------------------------------------------------------------------------------ #
 
-from src import utils
+from src import utils  # noqa: E402 -- root setup must precede local imports
 
 log = utils.get_pylogger(__name__)
 

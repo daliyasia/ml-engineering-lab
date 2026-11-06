@@ -197,6 +197,56 @@ The `pytest-cpu` JUnit artifact is uploaded even after pytest fails and retained
 
 After the first successful hosted run, repository administrators can require **Python tests (CPU)** under the branch rules for `main`. Branch protection is not changed automatically.
 
+## Code quality
+
+CI runs Ruff linting, Ruff formatting verification, and MyPy in the existing hosted CPU
+job. Each check can fail the job independently, and they still run if pytest fails.
+Coverage reporting, JUnit uploads, workflow triggers, and the local GPU-enabled Compose
+service are preserved. This workflow has no self-hosted GPU job or coverage threshold.
+
+Ruff checks Python files throughout the repository for common errors, unused imports
+and variables, and import ordering (`E4`, `E7`, `E9`, `F`, `I`). Its formatter uses four
+spaces, double quotes, and a 99-character line target. Datasets, generated files,
+experiment outputs, build artifacts, caches, and notebooks are outside these checks.
+Black is not required.
+
+Run checks locally through Compose:
+
+```bash
+docker compose run --build --rm tests uv run --locked ruff check .
+docker compose run --build --rm tests uv run --locked ruff format --check .
+docker compose run --build --rm tests uv run --locked mypy
+```
+
+To apply reviewed safe lint fixes and formatting to the checkout, use the existing
+Compose tools service, which mounts the checkout with the configured local user:
+
+```bash
+docker compose run --rm lock uv tool run --from ruff==0.17.4 ruff check . --fix
+docker compose run --rm lock uv tool run --from ruff==0.17.4 ruff format .
+```
+
+MyPy targets Python 3.12 and checks annotated code plus untyped function bodies, without
+global strict mode. Its initial enforced scope covers training, evaluation, the MNIST
+DataModule and Lightning module, network components, and shared utilities. Running
+`mypy` without paths uses the scope in `pyproject.toml`; CI passes the same paths
+explicitly. Only the untyped `torchvision` and `pyrootutils` imports and optional `wandb`
+imports have missing-import overrides.
+
+The adoption baseline was 41 Ruff diagnostics, 17 files requiring formatting, and 90
+MyPy errors across 12 source files. Type enforcement will expand first to callbacks,
+then the legacy detection helpers under `src/models/utils/`, then the unfinished
+cluster plugin. The latter two need tensor-state annotations, invalid tensor-call
+repairs, and cluster interface implementation. They are not covered by the initial
+MyPy command and have no project-wide error suppression. Use `mypy src` for a full
+backlog audit; Ruff continues to check all these modules.
+
+After the core repairs, the full-source audit reports 47 errors in four deferred
+files: `box_utils.py` and `loss_utils.py` have two invalid tensor-call overloads,
+`custom_metric.py` has 38 tensor-state operator errors, and `cluster_module.py`
+has seven missing-return, signature, and method-definition errors. The enforced
+core scope passes with no errors across 14 source files.
+
 ## Tests and remaining migration work
 
 The tests cover MNIST batches, Hydra object instantiation, short training runs, checkpoint resumption, evaluation, and sweeps. Running the full suite downloads MNIST and executes these bounded training tests; it does not start the default 500-epoch training job. For configuration checks without training, use:
