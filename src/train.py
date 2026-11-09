@@ -21,7 +21,10 @@ pyrootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
 # ------------------------------------------------------------------------------------ #
 
 from src import utils  # noqa: E402 -- root setup must precede local imports
-from src.utils.model_registry import publish_evaluated_model  # noqa: E402
+from src.utils.model_registry import (  # noqa: E402
+    extract_model_metadata,
+    publish_evaluated_model,
+)
 
 log = utils.get_pylogger(__name__)
 
@@ -105,7 +108,8 @@ def train(cfg: DictConfig) -> Tuple[dict, dict]:
             log.warning("Best ckpt not found! Using current weights for testing...")
             ckpt_path = None
         trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
-        publish_evaluated_model(trainer, model, cfg.registry, ckpt_path)
+        metadata = extract_model_metadata(datamodule, model, cfg.data, cfg.model)
+        publish_evaluated_model(trainer, model, cfg.registry, ckpt_path, metadata)
         log.info(f"Best ckpt path: {ckpt_path}")
 
     test_metrics = trainer.callback_metrics
